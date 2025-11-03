@@ -1,0 +1,52 @@
+name: Build uniCentaPOS
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        java-version: [11]
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java-version }}
+
+      - name: Install Apache Ant
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ant
+
+      - name: Install Apache Ant (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ant -y
+
+      - name: Verify Ant installation
+        run: ant -version
+
+      - name: Build uniCentaPOS
+        run: ant clean build
+
+      - name: List build output
+        run: |
+          echo "Build completed. Output files:"
+          ls -R dist || dir dist
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: unicenta-build-${{ matrix.os }}
+          path: dist/
