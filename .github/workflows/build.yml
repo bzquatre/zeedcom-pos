@@ -1,10 +1,10 @@
-name: Build uniCentaPOS
+name: Build ZeedComPOS
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
@@ -26,27 +26,65 @@ jobs:
           distribution: temurin
           java-version: ${{ matrix.java-version }}
 
-      - name: Install Apache Ant
+      - name: Install Apache Ant (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y ant
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ant zip
 
       - name: Install Apache Ant (Windows)
         if: runner.os == 'Windows'
-        run: choco install ant -y
+        run: |
+          choco install ant -y
+          choco install zip -y
 
       - name: Verify Ant installation
         run: ant -version
 
-      - name: Build uniCentaPOS
-        run: ant clean build
+      - name: Build ZeedComPOS
+        run: |
+          echo "🚀 Starting Ant build..."
+          ant clean jar || (echo "❌ Build failed!" && exit 1)
+          echo "✅ Build finished successfully."
 
-      - name: List build output
+      - name: Show build output
         run: |
           echo "Build completed. Output files:"
-          ls -R dist || dir dist
+          if [ -d "dist" ]; then ls -R dist; else dir dist; fi
+
+      - name: Create ZIP package
+        run: |
+          echo "📦 Creating ZIP package..."
+          mkdir -p release
+          zip -r release/zeedcompos-${{ matrix.os }}.zip dist/
+          echo "ZIP created successfully."
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: unicenta-build-${{ matrix.os }}
-          path: dist/
+          name: zeedcompos-build-${{ matrix.os }}
+          path: release/zeedcompos-${{ matrix.os }}.zip
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./release
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: ZeedComPOS Build ${{ github.run_number }}
+          body: |
+            Automated build of ZeedComPOS (based on uniCentaPOS 3.7)
+            - OS: Ubuntu & Windows
+            - Java: 11
+          files: release/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
