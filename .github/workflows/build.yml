@@ -1,90 +1,53 @@
-name: Build ZeedComPOS
+name: Build ZeedcomPOS
 
 on:
   push:
-    branches: [main, master]
+    branches: [ main ]
   pull_request:
-    branches: [main, master]
-  workflow_dispatch:
 
 jobs:
   build:
-    name: Build on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-        java-version: [11]
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source
+      - name: 🚀 Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK ${{ matrix.java-version }}
+      - name: ☕ Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: ${{ matrix.java-version }}
+          distribution: 'temurin'
+          java-version: '8'
 
-      - name: Install Apache Ant (Linux)
-        if: runner.os == 'Linux'
+      - name: 📦 Install missing dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ant zip
+          mkdir -p lib
+          cd lib
+          # RXTX for serial communication
+          curl -L -o RXTXcomm.jar https://repo1.maven.org/maven2/org/rxtx/rxtx/2.2pre2/rxtx-2.2pre2.jar
+          # Substance Look & Feel
+          curl -L -o substance.jar https://repo1.maven.org/maven2/org/pushing-pixels/substance/7.3/substance-7.3.jar
+          # SwingX
+          curl -L -o swingx-all.jar https://repo1.maven.org/maven2/org/swinglabs/swingx-all/1.6.5-1/swingx-all-1.6.5-1.jar
+          # JasperReports
+          curl -L -o jasperreports.jar https://repo1.maven.org/maven2/net/sf/jasperreports/jasperreports/6.20.6/jasperreports-6.20.6.jar
+          # Barcode4J
+          curl -L -o barcode4j.jar https://repo1.maven.org/maven2/org/krysalis/barcode4j/barcode4j/2.1/barcode4j-2.1.jar
+          # Apache Commons Lang
+          curl -L -o commons-lang.jar https://repo1.maven.org/maven2/commons-lang/commons-lang/2.6/commons-lang-2.6.jar
+          # CSV Reader
+          curl -L -o csvreader.jar https://repo1.maven.org/maven2/net/sourceforge/javacsv/javacsv/2.0/javacsv-2.0.jar
+          # JavaPOS
+          curl -L -o javapos.jar https://repo1.maven.org/maven2/org/javapos/javapos/1.14.3/javapos-1.14.3.jar
+          cd ..
 
-      - name: Install Apache Ant (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          choco install ant -y
-          choco install zip -y
-
-      - name: Verify Ant installation
-        run: ant -version
-
-      - name: Build ZeedComPOS
+      - name: 🧱 Build project using Ant
         run: |
           echo "🚀 Starting Ant build..."
-          ant clean jar || (echo "❌ Build failed!" && exit 1)
-          echo "✅ Build finished successfully."
+          ant -noinput -buildfile build.xml clean jar
 
-      - name: Show build output
-        run: |
-          echo "Build completed. Output files:"
-          if [ -d "dist" ]; then ls -R dist; else dir dist; fi
-
-      - name: Create ZIP package
-        run: |
-          echo "📦 Creating ZIP package..."
-          mkdir -p release
-          zip -r release/zeedcompos-${{ matrix.os }}.zip dist/
-          echo "ZIP created successfully."
-
-      - name: Upload build artifacts
+      - name: 📦 Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: zeedcompos-build-${{ matrix.os }}
-          path: release/zeedcompos-${{ matrix.os }}.zip
-
-  release:
-    name: Create GitHub Release
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./release
-
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ github.run_number }}
-          name: ZeedComPOS Build ${{ github.run_number }}
-          body: |
-            Automated build of ZeedComPOS (based on uniCentaPOS 3.7)
-            - OS: Ubuntu & Windows
-            - Java: 11
-          files: release/**/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: ZeedcomPOS-Build
+          path: dist/*.jar
